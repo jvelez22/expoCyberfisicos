@@ -9,18 +9,20 @@ class Simulation:
         self.env = Environment()
         self.robots = [Robot(np.random.randint(100, 700), np.random.randint(100, 500)) for _ in range(n_robots)]
         self.positions = np.array([robot.position for robot in self.robots])
-        
-        # Inicializar `best_position` a un valor válido dentro del entorno
         self.best_position = np.array([self.env.width / 2, self.env.height / 2])
-        
-    def objective_function(self, positions):
-        if self.best_position is None:
-            raise ValueError("best_position no ha sido inicializado correctamente")
-        distances = np.linalg.norm(positions - self.best_position, axis=1)
-        return distances
 
+    def objective_function(self, positions):
+        """Calcula la aptitud basada en la distancia al objetivo, penalizando colisiones."""
+        distances = np.linalg.norm(positions - self.best_position, axis=1)
+        penalties = np.zeros_like(distances)
+        for i, pos in enumerate(positions):
+            for obstacle in self.env.obstacles:
+                if obstacle.is_colliding(pos):
+                    penalties[i] += 1000  # Penalización alta por colisión
+        return distances + penalties
 
     def optimize(self):
+        """Optimiza las posiciones de los robots usando PSO."""
         optimizer = ps.single.GlobalBestPSO(
             n_particles=len(self.robots),
             dimensions=2,
@@ -31,6 +33,7 @@ class Simulation:
         self.best_position = best_position
 
     def run(self):
+        """Ejecuta la simulación."""
         running = True
         self.optimize()
 
@@ -42,7 +45,8 @@ class Simulation:
             self.env.update()
 
             for robot in self.robots:
-                robot.move(np.random.uniform(-1, 1, 2))
+                velocity = np.random.uniform(-1, 1, 2)
+                robot.move(velocity, self.env.obstacles)
                 robot.draw(self.env.screen)
 
         self.env.close()
